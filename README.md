@@ -1,5 +1,8 @@
 # Fedora 28 Raspberry Pi Setup Instructions
 
+## Install Instrctions
+Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
+
 ## armv7hl vs aarch64
 Right now the biggest factor for me is that that red and blue are reversed on aarch64, which makes for a bad desktop experience.
 
