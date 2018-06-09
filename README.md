@@ -4,7 +4,7 @@
 Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
 
 ## armv7hl vs aarch64
-Right now the biggest factor for me is that that red and blue are reversed on aarch64, which makes for a bad desktop experience.
+Right now the biggest factor for me is that that red and blue are reversed on aarch64 when not using the vc4 driver, which makes for a bad desktop experience.
 
 ## Official Touch Screen Support
 
