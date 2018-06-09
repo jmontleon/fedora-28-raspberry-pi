@@ -23,39 +23,11 @@ Update the kernel. Instead of running dracut to rebuild the initramfs and then u
 dnf -y update kernel
 ```
 
-### Update Device Tree
-The devicetree file needs to be updated.
-
-```
-git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
-cd linux-stable
-```
-
-Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-```
-  rpi_ft5406 {
-		compatible = "rpi,rpi-ft5406";
-		firmware = <&firmware>;
-		status = "okay";
-	};
-```
-
-```
-make oldconfig
-make dtbs
-```
-
-```
-cp
-```
-
-In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
-
 ### Set up the dkms
 This will get you the driver for the touchpad.
 
 ```
-dnf -y install dkms kernel-devel make
+dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign
 ```
 
 ```
@@ -453,3 +425,35 @@ dkms add -m rpi-ft5406 -v 1.0
 dkms build -m rpi-ft5406 -v 1.0
 dkms install -m rpi-ft5406 -v 1.0
 ```
+
+### Update Device Tree
+The devicetree file needs to be updated.
+
+```
+dnf -y install git
+```
+
+```
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+cd linux-stable
+```
+
+Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+```
+  rpi_ft5406 {
+		compatible = "rpi,rpi-ft5406";
+		firmware = <&firmware>;
+		status = "okay";
+	};
+```
+
+```
+make oldconfig
+make dtbs
+```
+
+```
+cp
+```
+
+In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
