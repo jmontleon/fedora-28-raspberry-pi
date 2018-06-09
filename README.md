@@ -96,7 +96,7 @@ cat << EOF >> rpi-ft5406.patch
  &firmware {
 EOF
 
-patch -p1 < rpi-ft5406.patch
+patch -p0 < rpi-ft5406.patch
 ```
 
 Build the dtb
