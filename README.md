@@ -79,18 +79,19 @@ patch -p1 < bcm2837-rpi-initial-3plus-support.patch
 
 ```
 cat << EOF >> rpi-ft5406.patch
---- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts.orig     2018-06-08 22:03:39.576476545 -0400
-+++ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts  2018-06-08 22:06:32.715681114 -0400
-@@ -33,6 +33,12 @@
+--- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts.orig     2018-06-08 22:09:50.109792061 -0400
++++ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts  2018-06-08 22:10:38.139576894 -0400
+@@ -33,6 +33,13 @@
                 compatible = "mmc-pwrseq-simple";
                 reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
         };
 +
-+       rpi_ft5406 {
-+               compatible = "rpi,rpi-ft5406";
-+               firmware = <&firmware>;
-+               status = "okay";
-+       };
++
++        rpi_ft5406 {
++                compatible = "rpi,rpi-ft5406";
++                firmware = <&firmware>;
++                status = "okay";
++        };
  };
 
  &firmware {
