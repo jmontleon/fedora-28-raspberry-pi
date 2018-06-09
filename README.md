@@ -7,7 +7,9 @@ Most instructions are available at https://fedoraproject.org/wiki/Architectures/
 Right now the biggest factor for me is that that red and blue are reversed on aarch64, which makes for a bad desktop experience.
 
 ## Official Touch Screen Support
-The vc4 driver will currently blank the official 7" touch screen so it needs to be blacklisted
+
+### Blacklist VC4
+The vc4 driver will currently blank the official 7" touch screen so it needs to be blacklisted. You will probably need to do this with an HDMI monitor and then attach the LCD. While at it. Be aware this blanking issue affects some HDMI monitors as well.
 
 ```
 cat << EOF >> /etc/modprobe.d/blacklist-vc4.conf
@@ -15,8 +17,19 @@ blacklist vc4
 EOF
 ```
 
-The devicetree file needs to be modified.
-Download and install the kernel source rpm. Use rpmbuild -bp to prepare the kernel source. 
+Update the kernel. Instead of running dracut to rebuild the initramfs and then updating the kernel later and sitting through the wait again just do so now. Once done shutdown, and attach the LCD. You should be able to get to a login prompt without losing video.
+
+```
+dnf -y update kernel
+```
+
+### Update Device Tree
+The devicetree file needs to be updated.
+
+```
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+cd linux-stable
+```
 
 Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 ```
@@ -27,7 +40,23 @@ Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 	};
 ```
 
-Set up the dkms driver
+```
+make oldconfig
+make dtbs
+```
+
+```
+cp
+```
+
+In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
+
+### Set up the dkms
+This will get you the driver for the touchpad.
+
+```
+dnf -y install dkms kernel-devel make
+```
 
 ```
 mkdir -p /usr/src/rpi-ft5406-1.0
