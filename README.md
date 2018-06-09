@@ -107,7 +107,7 @@ make dtbs
 
 Replace the current dtb 
 ```
-cp
+cp arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dtb /boot/dtb
 ```
 
 In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
