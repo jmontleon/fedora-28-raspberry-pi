@@ -73,17 +73,29 @@ dnf -y install git
 ```
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 cd linux-stable
-wget https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961
+ wget 'https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961' -O bcm2837-rpi-initial-3plus-support.patch
 patch -p1 < bcm2837-rpi-initial-3plus-support.patch
 ```
 
-Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 ```
-      rpi_ft5406 {
-        compatible = "rpi,rpi-ft5406";
-        firmware = <&firmware>;
-        status = "okay";
-      };
+cat << EOF >> rpi-ft5406.patch
+--- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts.orig     2018-06-08 21:57:46.024100824 -0400
++++ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts  2018-06-08 21:56:20.684492888 -0400
+@@ -34,6 +34,11 @@
+                reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
+        };
+
++       rpi_ft5406 {
++               compatible = "rpi,rpi-ft5406";
++               firmware = <&firmware>;
++               status = "okay";
++       };
+ };
+
+ &firmware {
+EOF
+
+patch -p1 < rpi-ft5406.patch
 ```
 
 Build the dtb
