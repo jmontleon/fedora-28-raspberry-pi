@@ -23,13 +23,14 @@ Update the kernel. Instead of running dracut to rebuild the initramfs and then u
 dnf -y update kernel
 ```
 
-### Set up the dkms
-This will get you the driver for the touchpad.
+### Set up dkms for the touchpad driver
 
+Install dkms and other packages required for kernel development
 ```
 dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign
 ```
 
+Create the directory for the driver module, create the dkms.conf, Makefile, and download the driver source.
 ```
 mkdir -p /usr/src/rpi-ft5406-1.0
 ```
@@ -55,6 +56,7 @@ EOF
 curl https://raw.githubusercontent.com/raspberrypi/linux/rpi-4.16.y/drivers/input/touchscreen/rpi-ft5406.c -o /usr/src/rpi-ft5406-1.0/rpi-ft5406.c
 ```
 
+Add, build, and install the module.
 ```
 dkms add -m rpi-ft5406 -v 1.0
 dkms build -m rpi-ft5406 -v 1.0
@@ -62,7 +64,7 @@ dkms install -m rpi-ft5406 -v 1.0
 ```
 
 ### Update Device Tree
-The devicetree file needs to be updated.
+The devicetree file needs to be updated to enable the touchpad.
 
 ```
 dnf -y install git
@@ -75,18 +77,20 @@ cd linux-stable
 
 Add this block below wifi_pwrseq in arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 ```
-  rpi_ft5406 {
-		compatible = "rpi,rpi-ft5406";
-		firmware = <&firmware>;
-		status = "okay";
-	};
+      rpi_ft5406 {
+        compatible = "rpi,rpi-ft5406";
+        firmware = <&firmware>;
+        status = "okay";
+      };
 ```
 
+Build the dtb
 ```
 make oldconfig
 make dtbs
 ```
 
+Replace the current dtb 
 ```
 cp
 ```
