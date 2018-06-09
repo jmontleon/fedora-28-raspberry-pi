@@ -101,7 +101,7 @@ patch --ignore-whitespace -p0 < rpi-ft5406.patch
 
 Build the dtb
 ```
-make oldconfig
+yes "" | make oldconfig
 make dtbs
 ```
 
