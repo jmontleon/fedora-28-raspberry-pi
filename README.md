@@ -73,7 +73,7 @@ dnf -y install git
 ```
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 cd linux-stable
- wget 'https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961' -O bcm2837-rpi-initial-3plus-support.patch
+wget 'https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961' -O bcm2837-rpi-initial-3plus-support.patch
 patch -p1 < bcm2837-rpi-initial-3plus-support.patch
 ```
 
