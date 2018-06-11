@@ -1,12 +1,12 @@
 # Fedora 28 Raspberry Pi Setup Instructions
 
-## Install Instrctions
+## Install Instructions
 Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
 
 ## armv7hl vs aarch64
 Right now the biggest factor for me is that that red and blue are reversed on aarch64 when not using the vc4 driver, which makes for a bad desktop experience.
 
-## Official Touch Screen Support
+## Official Raspberry Pi Touch Screen
 
 ### Blacklist VC4
 The vc4 driver will currently blank the official 7" touch screen so it needs to be blacklisted. You will probably need to do this with an HDMI monitor and then attach the LCD. While at it. Be aware this blanking issue affects some HDMI monitors as well.
@@ -23,14 +23,17 @@ Update the kernel. Instead of running dracut to rebuild the initramfs and then u
 dnf -y update kernel
 ```
 
+### Install and download everything we'll need to get touch working.
+
+```
+dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign python-xlib python-evdev git rpm-build
+
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+```
+
 ### Set up dkms for the touchpad driver
 
-Install dkms and other packages required for kernel development
-```
-dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign
-```
-
-Create the directory for the driver module, create the dkms.conf, Makefile, and download the driver source.
+Run these commands as root to create the directory, dkms.conf, Makefile, driver source file.
 ```
 mkdir -p /usr/src/rpi-ft5406-1.0
 ```
@@ -67,11 +70,6 @@ dkms install -m rpi-ft5406 -v 1.0
 The devicetree file needs to be updated to enable the touchpad.
 
 ```
-dnf -y install git
-```
-
-```
-git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 cd linux-stable
 wget 'https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961' -O bcm2837-rpi-initial-3plus-support.patch
 patch -p1 < bcm2837-rpi-initial-3plus-support.patch
@@ -111,3 +109,20 @@ cp arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dtb /boot/dtb
 ```
 
 In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
+
+### Right Click
+I used a script I found on Stack Exchange to get right click working.
+
+It required one unpackaged python module. Install it as your non-root user.
+
+```
+pip install --user PyMouse
+```
+
+The script is at https://codereview.stackexchange.com/questions/148696/touchscreen-right-click.
+I had to change the event10 to event2 in my case. And 'ELAN Touchscreen' to 'FT5406 memory based driver'
+
+I added it to my Xfce startup so whenever I log in it runs.
+
+### Firefox Bug
+This bug is two years old and was making me nuts. I believe anything from version 61.0 Beta 12 and up should fix it. I am working on building and testing that as it was just marked fixed 4 days ago.
