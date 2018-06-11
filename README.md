@@ -1,4 +1,6 @@
-# Fedora 28 Raspberry Pi Setup Instructions
+# Fedora 28 Raspberry Pi 3B+ Setup Instructions
+
+These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions. The biggest change would be to which device tree file you'd modify.
 
 ## Install Instructions
 Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
@@ -126,3 +128,5 @@ I added it to my Xfce startup so whenever I log in it runs.
 
 ### Firefox Bug
 This bug is two years old and was making me nuts. I believe anything from version 61.0 Beta 12 and up should fix it. I am working on building and testing that as it was just marked fixed 4 days ago.
+
+https://bugzilla.mozilla.org/show_bug.cgi?id=1321069
