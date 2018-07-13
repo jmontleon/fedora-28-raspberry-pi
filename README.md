@@ -208,3 +208,143 @@ while (<IN>) {
 Firefox has a bug where long pressing to right click disables left click. This is fixed in Firefox 61.0. As of this time builds are available on https://koji.fedoraproject.org to download. For example https://koji.fedoraproject.org/koji/buildinfo?buildID=1097146.
 
 https://bugzilla.mozilla.org/show_bug.cgi?id=1321069
+
+## Other Tweaks
+
+### Speed up dnf
+
+I found dnf to be abyssmally slow. Disabling deltarpm helped a bit.
+
+```
+echo "deltarpm=0" >> /etc/dnf/dnf.conf
+```
+
+## OpenHAB
+
+### Install
+
+Installation is described in detail at https://docs.openhab.org/installation/linux.html.
+
+```
+cat > /etc/yum.repos.d/openhab.repo << EOF
+[openHAB-Stable]
+name=openHAB 2.x.x Stable
+baseurl=https://dl.bintray.com/openhab/rpm-repo2/stable
+gpgcheck=1
+gpgkey=https://bintray.com/user/downloadSubjectPublicKey?username=openhab
+enabled=1
+EOF
+
+dnf -y install install openhab2 openhab2-addons
+```
+
+### JRE
+The performance of the openjdk 1.8.0 rpm package is intolerably slow. Even after SSL certificate generation, which can cause the first service start to take longer than normal, starts were taking 5 to 10 minutes. Using an alternative JDK with hard float support reduces that to seconds. Unfortunately there is no RPM package, so we'll grab a tarball and extract it.
+
+```
+wget http://cdn.azul.com/zulu-embedded/bin/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf.tar.gz
+```
+
+I extracted this to `/opt/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf/`
+
+And then I overrode the JAVA_HOME setting for the service to match.
+
+```
+mkdir -p /etc/systemd/system/openhab2.service.d/
+echo "Environment=JAVA_HOME=/opt/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf" > /etc/systemd/system/openhab2.service.d/override.conf
+```
+
+```
+systemctl daemon-reload openhab2
+systemctl enable openhab2
+systemctl start openhab2
+```
+
+### NGINX reverse proxy
+
+In order to add some security and listen on standard ports 80/443 you can install nginx and set it up as a reverse proxy.
+
+```
+dnf -y install nginx httpd-tools
+```
+
+Configure a user and password
+
+```
+htpasswd -c /etc/nginx/htpasswd USER
+```
+
+Create certs
+
+```
+mkdir -p /etc/pki/tls/nginx/
+cd /etc/pki/tls/nginx/
+openssl dhparam -out dhparam.pem 2048
+openssl req -x509 -nodes -days 15000 -newkey rsa:2048 -keyout openhab.key -out openhab.crt
+```
+
+Answer prompts to generated your certificate.
+
+Create a configuration file
+
+```
+export OPENHAB_HOSTNAME=foo
+
+cat > /etc/nginx/conf.d/openhab.conf << EOF
+server {
+    listen                          80;
+    server_name                     $OPENHAB_HOSTNAME;
+    return 301                      https://$server_name$request_uri;
+}
+
+server {
+  listen                               443 ssl;
+  server_name                          $OPENHAB_HOSTNAME;
+  ssl_certificate                      /etc/pki/tls/nginx/openhab.crt;
+  ssl_certificate_key                  /etc/pki/tls/nginx/openhab.key;
+  ssl_protocols                        TLSv1 TLSv1.1 TLSv1.2;
+  ssl_prefer_server_ciphers            on;
+  ssl_dhparam                          /etc/pki/tls/nginx/dhparam.pem;
+  ssl_ciphers                          ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:HIGH:!aNULL:!eNULL:!LOW:!3DES:!MD5:!EXP:!CBC:!EDH:!kEDH:!PSK:!SRP:!kECDH;
+  ssl_session_timeout                  1d;
+  ssl_session_cache                    shared:SSL:10m;
+  keepalive_timeout                    70;
+
+  location / {
+    proxy_pass                         http://localhost:8080;
+    proxy_set_header Host              $http_host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    auth_basic                         "Username and Password Required";
+    auth_basic_user_file               /etc/nginx/htpasswd;
+  }
+}
+EOF
+```
+
+Fix selinux to allow nginx to connect to port 8080
+
+```
+setsebool -P httpd_can_network_connect on
+```
+
+Enable and start nginx
+
+```
+systemctl enable nginx
+systemctl start nginx
+```
+
+### Firewall
+
+You should open port 80 in addition to 443. The protocol redirect in OpenHAB to the start page does not work correctly and will always send the user to http:// even if you connect via https://.
+
+As long as port 80 is open the user will be directed back to the SSL port and be oblivious to the issue.
+
+```
+firewall-cmd --add-port 80/tcp
+firewall-cmd --add-port 443/tcp
+firewall-cmd --add-port 80/tcp --permanent
+firewall-cmd --add-port 443/tcp --permanent
+```
