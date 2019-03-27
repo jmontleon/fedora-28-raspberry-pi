@@ -1,6 +1,6 @@
-# Fedora 28 Raspberry Pi 3B+ Setup Instructions
+# Fedora 29 Raspberry Pi 3B+ Setup Instructions
 
-These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions. The biggest change would be to which device tree file you'd modify.
+These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions. The biggest change would be to which device tree file you'd modify. It is important to update to at least a 5.0 kernel to follow these instructions. This is when the raspberrypi-ts driver became available
 
 ## Install Instructions
 Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
@@ -33,22 +33,11 @@ dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel fle
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 ```
 
-### Set up dkms for the touchpad driver
+### Set up dkms for the touchpad backlight driver
 
 Run these commands as root to create the directory, dkms.conf, Makefile, driver source file.
 ```
-mkdir -p /usr/src/rpi-ft5406-1.0
-```
-
-```
-cat << EOF >> /usr/src/rpi-ft5406-1.0/dkms.conf
-dkms driver
-PACKAGE_NAME="rpi-ft5406"
-PACKAGE_VERSION="1.0"
-BUILT_MODULE_NAME[0]="rpi-ft5406"
-DEST_MODULE_LOCATION[0]="/kernel/drivers/input/touchscreen/"
-AUTOINSTALL="yes"
-EOF
+mkdir -p /usr/src/rpi_backlight-1.0
 ```
 
 ```
@@ -62,33 +51,18 @@ AUTOINSTALL="yes"
 EOF
 ```
 
-
-```
-cat << EOF >> /usr/src/rpi-ft5406-1.0/Makefile
-obj-m	+= rpi-ft5406.o
-EOF
-```
-
 ```
 cat << EOF >> /usr/src/rpi_backlight-1.0/Makefile
 obj-m += rpi_backlight.o
 EOF
 ```
 
-
 ```
 curl https://raw.githubusercontent.com/raspberrypi/linux/rpi-4.16.y/drivers/video/backlight/rpi_backlight.c -o /usr/src/rpi_backlight-1.0/rpi_backlight.c
 ```
 
-```
-curl https://raw.githubusercontent.com/raspberrypi/linux/rpi-4.16.y/drivers/input/touchscreen/rpi-ft5406.c -o /usr/src/rpi-ft5406-1.0/rpi-ft5406.c
-```
-
 Add, build, and install the modules.
 ```
-dkms add -m rpi-ft5406 -v 1.0
-dkms build -m rpi-ft5406 -v 1.0
-dkms install -m rpi-ft5406 -v 1.0
 dkms add -m rpi_backlight -v 1.0
 dkms build -m rpi_backlight -v 1.0
 dkms install -m rpi_backlight -v 1.0
@@ -98,36 +72,38 @@ dkms install -m rpi_backlight -v 1.0
 The devicetree file needs to be updated to enable the touchpad.
 
 ```
-cd linux-stable
-wget 'https://src.fedoraproject.org/cgit/rpms/kernel.git/plain/bcm2837-rpi-initial-3plus-support.patch?h=f28&id=930c3373a22804fbf2764b78bc89d8ccf8e47961' -O bcm2837-rpi-initial-3plus-support.patch
-patch -p1 < bcm2837-rpi-initial-3plus-support.patch
-```
-
-```
-cat << EOF >> rpi-ft5406-backlight.patch
---- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts.orig     2018-06-08 22:09:50.109792061 -0400
-+++ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts  2018-06-08 22:10:38.139576894 -0400
-@@ -33,6 +33,18 @@
+cat << EOF >> rpi-ts.patch
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+index 42bb09044cc7..4f7d553110f9 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+@@ -33,6 +33,12 @@
                 compatible = "mmc-pwrseq-simple";
-                reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
+                reset-gpios = <&expgpio 1 GPIO_ACTIVE_LOW>;
         };
 +
-+        rpi_ft5406 {
-+                compatible = "rpi,rpi-ft5406";
-+                firmware = <&firmware>;
-+                status = "okay";
-+        };
-+
-+        rpi_backlight {
-+			compatible = "raspberrypi,rpi-backlight";
-+			firmware = <&firmware>;
-+			status = "okay";
-+		};
++       rpi_backlight {
++               compatible = "raspberrypi,rpi-backlight";
++               firmware = <&firmware>;
++               status = "okay";
++       };
  };
 
  &firmware {
+@@ -50,6 +56,11 @@
+                                  "";
+                status = "okay";
+        };
++
++       ts: touchscreen {
++               compatible = "raspberrypi,firmware-ts";
++       };
++
+ };
+
+ &hdmi {
 EOF
-patch --ignore-whitespace -p0 < rpi-ft5406-backlight.patch
+patch --ignore-whitespace -p1 < rpi-ts.patch
 ```
 
 Build the dtb
@@ -161,13 +137,14 @@ EOF
 ```
 
 ```
+cp /boot/dtb/bcm2837-rpi-3-b-plus.dtb /boot
 systemctl daemon-reload
 systemctl enable copy-dtb
 systemctl start copy-dtb
 ```
 
-### Right Click
-I used a script I found on Stack Exchange to get right click working.
+### Click Fix Script
+Since Fedora 28 I have also lost left click. I've modified the old script I used pretty heavily to provide both left and right click.
 
 It required one unpackaged python module. Install it as your non-root user.
 
@@ -175,11 +152,58 @@ It required one unpackaged python module. Install it as your non-root user.
 pip install --user PyMouse
 ```
 
-The script is at https://codereview.stackexchange.com/questions/148696/touchscreen-right-click.
-I had to change the event10 to event0 in my case. And 'ELAN Touchscreen' to 'FT5406 memory based driver'. The event handler will depend on how many input devices you have and in what order they are enumerated. When I had a USB keyboard plugged in it would appear as event2. You can look at /proc/bus/input/devices on the Handlers line to see which corresponds to your FT5406 memory based driver. It would probably be pretty easy to modify the script to lookup the value with something like:
 
 ```
-cat /proc/bus/input/devices | grep "FT5406 memory based driver" -A4 | grep -oE event.?[0-9]\{1,1}
+mkdir -p ~/bin
+cat << EOF > ~/bin/clickfix.py
+#!/bin/python
+
+from evdev import InputDevice
+import time
+from pymouse import PyMouse
+from threading import Timer
+import subprocess
+
+dev = InputDevice('/dev/input/by-path/platform-soc:firmware:touchscreen-event')
+m = PyMouse()
+lasttime = time.time()
+rlasttime = time.time()
+originaltime = lasttime
+oldclickx = 0
+oldclicky = 0
+
+
+for event in dev.read_loop():
+
+    if event.type == 3 and event.code == 47 and event.value == 1:
+        rclicktime = time.time()
+        if (rclicktime - rlasttime) < .5:
+            rlasttime = rclicktime
+        else:
+            print "Two Finger tap."
+            subprocess.check_call(['xinput', '--disable', 'raspberrypi-ts'])
+            x2, y2 = m.position()  # Get the pointer coordinates
+            m.click(x2, y2, 2)
+            subprocess.check_call(['xinput', '--enable', 'raspberrypi-ts'])
+            rlasttime = rclicktime
+
+    elif event.type == 1 and event.code == 330 and event.value == 1:
+        clicktime = time.time()
+        clickx, clicky = m.position()
+        if (clicktime - lasttime) < .5 and (abs(clickx - oldclickx) < 20) and (abs(clicky - oldclicky) < 20):
+            print "Double click."
+            subprocess.check_call(['xinput', '--disable', 'raspberrypi-ts'])
+            x2, y2 = m.position()
+            m.click(x2, y2, 1)
+            m.click(x2, y2, 1)
+            subprocess.check_call(['xinput', '--enable', 'raspberrypi-ts'])
+            lasttime = originaltime
+        else:
+            lasttime = clicktime
+        oldclickx = clickx
+        oldclicky = clicky
+EOF
+chmod +x ~/bin/clickfix.py
 ```
 
 I added the script to my Xfce startup so whenever I log in it runs.
@@ -202,149 +226,4 @@ while (<IN>) {
         $blanked = 0;
     }
 }
-```
-
-### Firefox Bug
-Firefox has a bug where long pressing to right click disables left click. This is fixed in Firefox 61.0. As of this time builds are available on https://koji.fedoraproject.org to download. For example https://koji.fedoraproject.org/koji/buildinfo?buildID=1097146.
-
-https://bugzilla.mozilla.org/show_bug.cgi?id=1321069
-
-## Other Tweaks
-
-### Speed up dnf
-
-I found dnf to be abyssmally slow. Disabling deltarpm helped a bit.
-
-```
-echo "deltarpm=0" >> /etc/dnf/dnf.conf
-```
-
-## OpenHAB
-
-### Install
-
-Installation is described in detail at https://docs.openhab.org/installation/linux.html.
-
-```
-cat > /etc/yum.repos.d/openhab.repo << EOF
-[openHAB-Stable]
-name=openHAB 2.x.x Stable
-baseurl=https://dl.bintray.com/openhab/rpm-repo2/stable
-gpgcheck=1
-gpgkey=https://bintray.com/user/downloadSubjectPublicKey?username=openhab
-enabled=1
-EOF
-
-dnf -y install install openhab2 openhab2-addons
-```
-
-### JRE
-The performance of the openjdk 1.8.0 rpm package is intolerably slow. Even after SSL certificate generation, which can cause the first service start to take longer than normal, starts were taking 5 to 10 minutes. Using an alternative JDK with hard float support reduces that to seconds. Unfortunately there is no RPM package, so we'll grab a tarball and extract it.
-
-```
-wget http://cdn.azul.com/zulu-embedded/bin/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf.tar.gz
-```
-
-I extracted this to `/opt/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf/`
-
-And then I overrode the JAVA_HOME setting for the service to match.
-
-```
-mkdir -p /etc/systemd/system/openhab2.service.d/
-echo "Environment=JAVA_HOME=/opt/ezdk-1.8.0_172-8.30.0.106-eval-linux_aarch32hf" > /etc/systemd/system/openhab2.service.d/override.conf
-```
-
-```
-systemctl daemon-reload openhab2
-systemctl enable openhab2
-systemctl start openhab2
-```
-
-### NGINX reverse proxy
-
-In order to add some security and listen on standard ports 80/443 you can install nginx and set it up as a reverse proxy.
-
-```
-dnf -y install nginx httpd-tools
-```
-
-Configure a user and password
-
-```
-htpasswd -c /etc/nginx/htpasswd USER
-```
-
-Create certs
-
-```
-mkdir -p /etc/pki/tls/nginx/
-cd /etc/pki/tls/nginx/
-openssl dhparam -out dhparam.pem 2048
-openssl req -x509 -nodes -days 15000 -newkey rsa:2048 -keyout openhab.key -out openhab.crt
-```
-
-Answer prompts to generated your certificate.
-
-Create a configuration file
-
-```
-export OPENHAB_HOSTNAME=foo
-
-cat > /etc/nginx/conf.d/openhab.conf << EOF
-server {
-    listen                          80;
-    server_name                     $OPENHAB_HOSTNAME;
-    return 301                      https://$server_name$request_uri;
-}
-
-server {
-  listen                               443 ssl;
-  server_name                          $OPENHAB_HOSTNAME;
-  ssl_certificate                      /etc/pki/tls/nginx/openhab.crt;
-  ssl_certificate_key                  /etc/pki/tls/nginx/openhab.key;
-  ssl_protocols                        TLSv1 TLSv1.1 TLSv1.2;
-  ssl_prefer_server_ciphers            on;
-  ssl_dhparam                          /etc/pki/tls/nginx/dhparam.pem;
-  ssl_ciphers                          ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:HIGH:!aNULL:!eNULL:!LOW:!3DES:!MD5:!EXP:!CBC:!EDH:!kEDH:!PSK:!SRP:!kECDH;
-  ssl_session_timeout                  1d;
-  ssl_session_cache                    shared:SSL:10m;
-  keepalive_timeout                    70;
-
-  location / {
-    proxy_pass                         http://localhost:8080;
-    proxy_set_header Host              $http_host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    auth_basic                         "Username and Password Required";
-    auth_basic_user_file               /etc/nginx/htpasswd;
-  }
-}
-EOF
-```
-
-Fix selinux to allow nginx to connect to port 8080
-
-```
-setsebool -P httpd_can_network_connect on
-```
-
-Enable and start nginx
-
-```
-systemctl enable nginx
-systemctl start nginx
-```
-
-### Firewall
-
-You should open port 80 in addition to 443. The protocol redirect in OpenHAB to the start page does not work correctly and will always send the user to http:// even if you connect via https://.
-
-As long as port 80 is open the user will be directed back to the SSL port and be oblivious to the issue.
-
-```
-firewall-cmd --add-port 80/tcp
-firewall-cmd --add-port 443/tcp
-firewall-cmd --add-port 80/tcp --permanent
-firewall-cmd --add-port 443/tcp --permanent
 ```
