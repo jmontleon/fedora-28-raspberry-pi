@@ -1,12 +1,15 @@
 # Fedora 29 Raspberry Pi 3B+ Setup Instructions
 
-These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions. The biggest change would be to which device tree file you'd modify. It is important to update to at least a 5.0 kernel to follow these instructions. This is when the raspberrypi-ts driver became available
+These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions.
 
 ## Install Instructions
 Most instructions are available at https://fedoraproject.org/wiki/Architectures/ARM/Raspberry_Pi
 
 ## armv7hl vs aarch64
-Right now the biggest factor for me is that that red and blue are reversed on aarch64 when not using the vc4 driver, which makes for a bad desktop experience.
+- With Fedora 30 I no longer have inverted colors when using fbdev like I did with Fedora 28.
+- Aarch64 uses grub2 as the boot loader, which currently does not have support for device tree overlays
+- Regardless of architecture the correct touchscreen overlay is not included
+- I chose to go with aarch64. If you go with armv7hl the instructions will be similar, but dtb locations may vary a bit.
 
 ## Official Raspberry Pi Touch Screen
 
@@ -28,7 +31,7 @@ dnf -y update kernel
 ### Install and download everything we'll need to get touch and backlight control working.
 
 ```
-dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign python-xlib python-evdev git rpm-build
+dnf -y install dkms kernel-devel make bc bison bzip2 elfutils elfutils-devel flex libkcapi-hmaccalc m4 net-tools openssl-devel patch perl-devel perl-generators pesign python3-xlib python3-evdev git rpm-build
 
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 ```
@@ -112,11 +115,6 @@ yes "" | make oldconfig
 make dtbs
 ```
 
-Replace the current dtb
-```
-cp arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dtb /boot/dtb
-```
-
 In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
 
 This can be handled automatically with a shutdown service file
@@ -129,7 +127,7 @@ Description=Copy custom DTB into place, necessary when the kernel is updated
 [Service]
 Type=oneshot
 RemainAfterExit=true
-ExecStop=/bin/cp -f /boot/bcm2837-rpi-3-b-plus.dtb /boot/dtb/bcm2837-rpi-3-b-plus.dtb
+ExecStop=/bin/cp -f /boot/bcm2837-rpi-3-b-plus.dtb /boot/dtb/broadcom/bcm2837-rpi-3-b-plus.dtb
 
 [Install]
 WantedBy=multi-user.target
@@ -144,19 +142,18 @@ systemctl start copy-dtb
 ```
 
 ### Click Fix Script
-Since Fedora 28 I have also lost left click. I've modified the old script I used pretty heavily to provide both left and right click.
+While the touchscreen works I have been unable to left or right click without a script like this.
 
 It required one unpackaged python module. Install it as your non-root user.
 
 ```
-pip install --user PyMouse
+pip3 install --user PyUserInput
 ```
-
 
 ```
 mkdir -p ~/bin
 cat << EOF > ~/bin/clickfix.py
-#!/bin/python
+#!/bin/python3
 
 from evdev import InputDevice
 import time
