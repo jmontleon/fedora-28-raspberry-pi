@@ -1,4 +1,4 @@
-# Fedora 29 Raspberry Pi 3B+ Setup Instructions
+# Fedora 30 Raspberry Pi 3B+ Setup Instructions
 
 These instructions relate primarily to getting the official Raspberry Pi Touchscreen working and could probably be followed for most recent Pi versions.
 
