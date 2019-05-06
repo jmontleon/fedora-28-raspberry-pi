@@ -7,14 +7,21 @@ Most instructions are available at https://fedoraproject.org/wiki/Architectures/
 
 ## armv7hl vs aarch64
 - With Fedora 30 I no longer have inverted colors when using fbdev like I did with Fedora 28.
-- Aarch64 uses grub2 as the boot loader, which currently does not have support for device tree overlays
+- How you enable overlays is a bit different
+  - For armvh7hl remove the ftddir line in /boot/extlinux/extlinux.conf
+  - For aarch64 unlink /boot/dtb
 - Regardless of architecture the correct touchscreen overlay is not included
-- I chose to go with aarch64. If you go with armv7hl the instructions will be similar, but dtb locations may vary a bit.
+- I chose to go with aarch64.
+  - If you go with armv7hl the instructions will be similar, but dtb locations may vary a bit.
 
 ## Official Raspberry Pi Touch Screen
 
 ### Blacklist VC4
-The vc4 driver will currently blank the official 7" touch screen so it needs to be blacklisted. You will probably need to do this with an HDMI monitor and then attach the LCD. While at it. Be aware this blanking issue affects some HDMI monitors as well.
+The vc4 driver will currently blank the official 7" touch screen until we get the dtb updated. For the time being it needs to be blacklisted if you're using the touch display.
+
+You will probably need to do this with an HDMI monitor and then attach the LCD. While at it. Be aware this blanking issue affects some HDMI monitors as well. If you find mid-boot the screen blanks out you can use this same workaround but the fix will likely not be relevant.
+
+Below we'll patch the dts(i) files to fix this and unblacklist it.
 
 ```
 cat << EOF >> /etc/modprobe.d/blacklist-vc4.conf
@@ -22,7 +29,7 @@ blacklist vc4
 EOF
 ```
 
-Update the kernel. Instead of running dracut to rebuild the initramfs and then updating the kernel later and sitting through the wait again just do so now. Once done shutdown, and attach the LCD. You should be able to get to a login prompt without losing video.
+Instead of running `dracut -f` to rebuild the initramfs, update the kernel to save some waiting later. Once done shutdown, and attach the LCD. You should be able to get to a login prompt without losing video.
 
 ```
 dnf -y update kernel
@@ -77,7 +84,7 @@ The devicetree file needs to be updated to enable the touchpad.
 ```
 cat << EOF >> rpi-ts.patch
 diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-index 42bb09044cc7..4f7d553110f9 100644
+index abb2bc7..486df37 100644
 --- a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 @@ -33,6 +33,12 @@
@@ -104,7 +111,67 @@ index 42bb09044cc7..4f7d553110f9 100644
 +
  };
 
- &hdmi {
+ &gpio {
+@@ -157,6 +168,11 @@
+        bus-width = <4>;
+ };
+
++&i2c_dsi {
++       gpios = <&gpio 44 0
++                &gpio 45 0>;
++};
++
+ /* uart0 communicates with the BT module */
+ &uart0 {
+        pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 2def068..cc38287 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -562,7 +562,11 @@
+                                             "dsi1_ddr2",
+                                             "dsi1_ddr";
+
+-                       status = "disabled";
++                       port {
++                               dsi_out_port: endpoint {
++                                       remote-endpoint = <&panel_dsi_port>;
++                               };
++                       };
+                };
+
+                i2c1: i2c@7e804000 {
+@@ -634,6 +638,30 @@
+                vc4: gpu {
+                        compatible = "brcm,bcm2835-vc4";
+                };
++
++               i2c_dsi: i2c {
++                       /* We have to use i2c-gpio because the
++                        * firmware is also polling another device
++                        * using the only hardware I2C bus that could
++                        * connect to these pins.
++                        */
++
++                       compatible = "i2c-gpio";
++                       #address-cells = <1>;
++                       #size-cells = <0>;
++                       gpios = <&gpio 28 0
++                                &gpio 29 0>;
++
++                       lcd@45 {
++                               compatible = "raspberrypi,panel_raspberrypi_touchscreen";
++                               reg = <0x45>;
++                               port {
++                                       panel_dsi_port: endpoint {
++                                               remote-endpoint = <&dsi_out_port>;
++                                       };
++                               };
++                       };
++               };
+        };
+
+        clocks {
 EOF
 patch --ignore-whitespace -p1 < rpi-ts.patch
 ```
@@ -113,9 +180,10 @@ Build the dtb
 ```
 yes "" | make oldconfig
 make dtbs
+cp arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb /boot
 ```
 
-In practice this file does not change often, so generally speaking you can copy the dtb file from /boot/dtb-$(previous-kernel-ver) /boot/dtb.
+In practice this file does not change often, so generally speaking you can copy it to /boot/dtb for each new kernel installed.
 
 This can be handled automatically with a shutdown service file
 
@@ -135,16 +203,27 @@ EOF
 ```
 
 ```
-cp /boot/dtb/bcm2837-rpi-3-b-plus.dtb /boot
 systemctl daemon-reload
 systemctl enable copy-dtb
 systemctl start copy-dtb
 ```
 
+These changes also fix the vc4 driver when using DSI (e.g. 7" Raspberry Pi Touchscreen) so you can enable the driver again if you disabled it.
+
+```
+rm /etc/modprobe.d/vc4.conf
+dracut -f
+```
+
 ### Click Fix Script
 While the touchscreen works I have been unable to left or right click without a script like this.
 
-It required one unpackaged python module. Install it as your non-root user.
+Add your user to the input group so it can connect to the input dev
+```
+usermod -aG input $your-non-root-username
+```
+
+This script requires one unpackaged python module. Install it as your non-root user.
 
 ```
 pip3 install --user PyUserInput
@@ -177,7 +256,7 @@ for event in dev.read_loop():
         if (rclicktime - rlasttime) < .5:
             rlasttime = rclicktime
         else:
-            print "Two Finger tap."
+            print("Two Finger tap.")
             subprocess.check_call(['xinput', '--disable', 'raspberrypi-ts'])
             x2, y2 = m.position()  # Get the pointer coordinates
             m.click(x2, y2, 2)
@@ -188,7 +267,7 @@ for event in dev.read_loop():
         clicktime = time.time()
         clickx, clicky = m.position()
         if (clicktime - lasttime) < .5 and (abs(clickx - oldclickx) < 20) and (abs(clicky - oldclicky) < 20):
-            print "Double click."
+            print("Double click.")
             subprocess.check_call(['xinput', '--disable', 'raspberrypi-ts'])
             x2, y2 = m.position()
             m.click(x2, y2, 1)
